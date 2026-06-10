@@ -4,77 +4,62 @@ from sqlalchemy.orm import Session
 from src.db import SessionLocal
 from src.models import Atividade, Evento, Cidade, Escola, Usuario
 
-ferramentas = ["Pequeno Grande Cidadão", "Aventura Fiscal", "Palavras Cruzadas", "Palavras mágicas"]
-tributos = ["ICMS", "IPTU", "IPVA"]
-nomes_cidades = ["Cuiabá", "Várzea Grande", "Sinop", "Santo Antônio"]
-nomes_escolas = ["Escola Santa Maria", "Colégio Dom Bosco", "CEFET-MT", "Instituto Federal"]
+ferramentas = ["Pequeno Grande Cidadão", "FlagMatch", "BordersQuiz", "Atoms Game"]
+tributos = ["ICMS", "IPVA", "IPTU", "ISS"]
+
+dados_geograficos = {
+    "Cuiabá": ["Escola Estadual Cuiabá", "Colégio Particular Alpha"],
+    "Várzea Grande": ["Escola Municipal VG", "Instituto Federal VG"],
+    "Sinop": ["Escola do Norte", "Colégio Sinopse"],
+    "Santo Antônio": ["Escola Rural Sto Antônio"]
+}
 
 def popular_banco():
     db = SessionLocal()
     
-    # Criar Cidades
-    cidades_objs = []
-    for nome in nomes_cidades:
-        cid = db.query(Cidade).filter(Cidade.nome == nome).first()
+    # Criar cidades e escolas se não existirem
+    escolas_objs = []
+    for nome_cidade, escolas_lista in dados_geograficos.items():
+        cid = db.query(Cidade).filter(Cidade.nome == nome_cidade).first()
         if not cid:
-            cid = Cidade(nome=nome)
+            cid = Cidade(nome=nome_cidade)
             db.add(cid)
             db.commit()
             db.refresh(cid)
-        cidades_objs.append(cid)
-
-    # Criar Escolas
-    escolas_objs = []
-    for nome in nomes_escolas:
-        esc = db.query(Escola).filter(Escola.nome == nome).first()
-        if not esc:
-            esc = Escola(nome=nome, id_cidade=random.choice(cidades_objs).id)
-            db.add(esc)
-            db.commit()
-            db.refresh(esc)
-        escolas_objs.append(esc)
-
-    # Criar Usuários e Atividades
-    # Primeiro, garantir que cada escola tenha pelo menos alguns usuários com atividades
-    for escola in escolas_objs:
-        for i in range(3):  # 3 usuários por escola garantidos
-            id_usuario = f"estudante_{escola.id}_{i}"
-            usuario = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
-            if not usuario:
-                usuario = Usuario(
-                    id_usuario=id_usuario,
-                    nome=f"Aluno {escola.nome} {i+1}",
-                    id_escola=escola.id,
-                    id_cidade=escola.id_cidade
-                )
-                db.add(usuario)
-                db.commit()
-            
-            # Adicionar atividades para este usuário
-            for _ in range(2):
-                gerar_atividade_para_usuario(db, id_usuario)
-
-    # Depois, adicionar mais dados aleatórios
-    for i in range(30):
-        escola_escolhida = random.choice(escolas_objs)
-        id_usuario = f"estudante_random_{random.randint(1000, 9999)}"
         
-        usuario = db.query(Usuario).filter(Usuario.id_usuario == id_usuario).first()
+        for nome_esc in escolas_lista:
+            esc = db.query(Escola).filter(Escola.nome == nome_esc).first()
+            if not esc:
+                esc = Escola(nome=nome_esc, id_cidade=cid.id)
+                db.add(esc)
+                db.commit()
+                db.refresh(esc)
+            escolas_objs.append(esc)
+
+    # Gerar 40 usuários distribuídos pelas escolas/cidades
+    for i in range(1, 41):
+        # Rotaciona as escolas para garantir que todas (e cidades) tenham alunos
+        esc_obj = escolas_objs[i % len(escolas_objs)]
+        id_u = f"user_{1000 + i}"
+        
+        usuario = db.query(Usuario).filter(Usuario.id_usuario == id_u).first()
         if not usuario:
             usuario = Usuario(
-                id_usuario=id_usuario,
-                nome=f"Aluno {id_usuario.split('_')[-1]}",
-                id_escola=escola_escolhida.id,
-                id_cidade=escola_escolhida.id_cidade
+                id_usuario=id_u,
+                nome=f"User{1000 + i}",
+                id_escola=esc_obj.id,
+                id_cidade=esc_obj.id_cidade
             )
             db.add(usuario)
             db.commit()
-
-        gerar_atividade_para_usuario(db, id_usuario)
+        
+        # Gerar 2 atividades para cada usuário
+        for _ in range(2):
+            gerar_atividade_para_usuario(db, id_u)
             
     db.commit()
     db.close()
-    print("Banco populado com sucesso com a nova estrutura!")
+    print("Banco populado com sucesso com nomes anonimizados e dados em todas as cidades!")
 
 def gerar_atividade_para_usuario(db, id_usuario):
     ferramenta_escolhida = random.choice(ferramentas)
@@ -109,7 +94,7 @@ def gerar_atividade_para_usuario(db, id_usuario):
         )
         db.add(novo_evento)
 
-    # Garantir finalização para a maioria, mas deixar alguns em progresso
+    # Garantir finalização para a maioria
     if random.random() > 0.2:
         db.add(Evento(
             id_atividade=id_atividade,
@@ -118,9 +103,6 @@ def gerar_atividade_para_usuario(db, id_usuario):
             dados_especificos={"status": "concluido"}
         ))
     db.commit()
-
-if __name__ == "__main__":
-    popular_banco()
 
 if __name__ == "__main__":
     popular_banco()

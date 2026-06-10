@@ -137,11 +137,14 @@ def get_atividade_recente(db: Session = Depends(get_db)):
     resultado = []
     
     for evt in ultimos:
-        nome_aluno = evt.atividade.id_usuario if evt.atividade else "Anônimo"
+        nome_aluno = evt.atividade.id_usuario if evt.atividade else "Anonymous"
         
-        if "estudante" in nome_aluno:
+        if "estudante" in nome_aluno or "user" in nome_aluno:
             partes = nome_aluno.split("_")
-            nome_aluno = f"Aluno {partes[1]}" if len(partes) > 1 else nome_aluno
+            nome_aluno = f"User{partes[1]}" if len(partes) > 1 else nome_aluno
+        elif "aluno" in nome_aluno:
+             partes = nome_aluno.split("_")
+             nome_aluno = f"User{partes[-1]}" if len(partes) > 1 else nome_aluno
 
         resultado.append({
             "estudante": nome_aluno,
